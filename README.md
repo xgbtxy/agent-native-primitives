@@ -20,6 +20,29 @@ Normal discovery does not execute programs or persist a machine inventory. Expli
 
 The competitive boundary is recorded in [docs/research.md](docs/research.md). Current local-machine results, including a failed initial A/B and the corrected epistemic contract, are in [docs/local-smoke-2026-07-11.md](docs/local-smoke-2026-07-11.md).
 
+## Install a binary release
+
+The [latest GitHub Release](https://github.com/xgbtxy/agent-native-primitives/releases/latest) contains exactly two platform packages:
+
+- `tooltruth_<version>_windows_x86_64.zip`
+- `tooltruth_<version>_macos_universal.tar.gz` for both Apple Silicon and Intel Macs
+
+Extract the package and place `tooltruth` or `tooltruth.exe` in a directory already on `PATH`. Then verify:
+
+```text
+tooltruth version
+```
+
+Every release includes `SHA256SUMS.txt` and GitHub build-provenance attestations. Verify provenance with GitHub CLI:
+
+```text
+gh attestation verify <downloaded-package> --repo xgbtxy/agent-native-primitives
+```
+
+The macOS binary supports discovery commands. The curated Binwalk repair recipe remains Windows/x86_64-only in this experimental release.
+
+The initial packages are not signed with commercial Windows or Apple developer certificates and are not Apple-notarized. Checksums and GitHub provenance establish release origin, but the operating system may still display an unknown-publisher warning.
+
 ## Current experimental CLI
 
 ```powershell

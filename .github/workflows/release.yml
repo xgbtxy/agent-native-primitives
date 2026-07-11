@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - run: go test -race ./...
+      - run: go vet ./...
+
+  windows:
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - name: Build and package Windows x86_64
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          $package = "tooltruth_${version}_windows_x86_64"
+          $stage = Join-Path $PWD "stage\$package"
+          New-Item -ItemType Directory -Force -Path $stage, (Join-Path $PWD "dist") | Out-Null
+          $env:CGO_ENABLED = "0"
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          go build -trimpath -ldflags "-s -w -X main.version=$version" -o (Join-Path $stage "tooltruth.exe") ./cmd/tooltruth
+          Copy-Item LICENSE, README.md -Destination $stage
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath (Join-Path $PWD "dist\$package.zip")
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-release
+          path: dist/*.zip
+          if-no-files-found: error
+
+  macos:
+    needs: verify
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.23.x'
+          cache: false
+      - name: Build and package macOS Universal
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          package="tooltruth_${version}_macos_universal"
+          mkdir -p "stage/$package" dist build
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$version" -o build/tooltruth-amd64 ./cmd/tooltruth
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$version" -o build/tooltruth-arm64 ./cmd/tooltruth
+          lipo -create -output "stage/$package/tooltruth" build/tooltruth-amd64 build/tooltruth-arm64
+          lipo -verify_arch x86_64 arm64 "stage/$package/tooltruth"
+          chmod 0755 "stage/$package/tooltruth"
+          codesign --force --sign - "stage/$package/tooltruth"
+          codesign --verify --strict "stage/$package/tooltruth"
+          cp LICENSE README.md "stage/$package/"
+          tar -C "stage/$package" -czf "dist/$package.tar.gz" .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-release
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum *.zip *.tar.gz > SHA256SUMS.txt
+      - name: Attest release packages
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/*.tar.gz
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "tooltruth $GITHUB_REF_NAME" --generate-notes

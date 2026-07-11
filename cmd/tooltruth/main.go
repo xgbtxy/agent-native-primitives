@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const version = "0.3.0-dev"
+var version = "0.1.0-dev"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
