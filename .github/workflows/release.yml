@@ -67,7 +67,7 @@ jobs:
           CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$version" -o build/tooltruth-amd64 ./cmd/tooltruth
           CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$version" -o build/tooltruth-arm64 ./cmd/tooltruth
           lipo -create -output "stage/$package/tooltruth" build/tooltruth-amd64 build/tooltruth-arm64
-          lipo -verify_arch x86_64 arm64 "stage/$package/tooltruth"
+          lipo "stage/$package/tooltruth" -verify_arch x86_64 arm64
           chmod 0755 "stage/$package/tooltruth"
           codesign --force --sign - "stage/$package/tooltruth"
           codesign --verify --strict "stage/$package/tooltruth"
