@@ -1,0 +1,9 @@
+/dist/
+/reviews/
+*.exe
+*.test
+*.out
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

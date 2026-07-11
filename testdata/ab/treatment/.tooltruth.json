@@ -1,0 +1,23 @@
+{
+  "capabilities": [
+    {
+      "id": "firmware-unpack",
+      "family": "firmware_extraction",
+      "command": "fwx",
+      "description": "Extract a supported router firmware image into a filesystem tree.",
+      "capabilities": ["firmware_extraction"],
+      "intents": [
+        "拆包路由器固件",
+        "把路由器固件提取成文件系统目录",
+        "extract router firmware into a filesystem tree"
+      ],
+      "examples": [
+        {
+          "intent": "拆包路由器固件",
+          "command": "fwx unpack image.bin"
+        }
+      ],
+      "risk": "medium"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "capabilities": [
+    {
+      "id": "grok-x-research",
+      "family": "ai_research",
+      "command": "grok",
+      "description": "Run the locally installed Grok CLI for web and X/Twitter research tasks.",
+      "capabilities": ["x_search", "web_research"],
+      "intents": [
+        "使用 XSearch 检索 X 推文",
+        "调用 Grok 调研推文",
+        "research X posts with Grok"
+      ],
+      "examples": [
+        {
+          "intent": "调用 Grok 调研推文",
+          "command": "grok -p \"<research prompt>\" --output-format plain"
+        }
+      ],
+      "risk": "medium"
+    }
+  ]
+}
