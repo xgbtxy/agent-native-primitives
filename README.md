@@ -45,6 +45,18 @@ The macOS binary supports discovery commands. The curated Binwalk repair recipe 
 
 The initial packages are not signed with commercial Windows or Apple developer certificates and are not Apple-notarized. Checksums and GitHub provenance establish release origin, but the operating system may still display an unknown-publisher warning.
 
+## Minimal AI integration
+
+Install the binary on `PATH`, then give an AI host one rule:
+
+```text
+When command availability is uncertain, run `tooltruth resolve <exact candidate names...>` once and use only entries in `present`. Add `--identity` only when implementation or version changes the decision. Do not call Tooltruth before familiar commands.
+```
+
+That rule is the complete integration. Tooltruth remains an ordinary child CLI: no MCP server, daemon, shell hook, startup scan, or automatically injected environment inventory is required. A host that forbids unknown child commands must allow the installed binary through its own command policy; Tooltruth does not bypass its parent.
+
+The public help intentionally presents only `resolve` and `version`. Earlier experiments remain available under `tooltruth help --all`, but an AI does not need to learn them.
+
 ## Current experimental CLI
 
 ```powershell

@@ -57,8 +57,7 @@ func run(args []string) error {
 		fmt.Println(version)
 		return nil
 	case "help", "--help", "-h":
-		printUsage()
-		return nil
+		return runHelp(args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -80,6 +79,10 @@ type resolvedCommand struct {
 }
 
 func runResolve(args []string) error {
+	if len(args) == 1 && (args[0] == "help" || args[0] == "--help" || args[0] == "-h") {
+		printResolveUsage()
+		return nil
+	}
 	humanOutput := takeBool(&args, "--human")
 	identityOutput := takeBool(&args, "--identity")
 	_ = takeBool(&args, "--json")
@@ -607,10 +610,63 @@ func printCompactJSON(value any) error {
 
 func printUsage() {
 	name := filepath.Base(os.Args[0])
-	fmt.Printf(`Tooltruth filters AI-proposed command names against live local facts.
+	fmt.Printf(`Tooltruth tells an AI which exact command names are callable now.
 
 Usage:
   %s resolve [--project DIR] [--identity] [--human] COMMAND...
+  %s version
+
+Default output is compact JSON. Candidates are never executed unless
+--identity requests a fixed, bounded version probe for a known command.
+
+Run "%s help resolve" for the exact contract or "%s help --all" for
+experimental and diagnostic commands.
+`, name, name, name, name)
+}
+
+func runHelp(args []string) error {
+	if len(args) == 0 {
+		printUsage()
+		return nil
+	}
+	if len(args) != 1 {
+		return fmt.Errorf("help accepts at most one topic")
+	}
+	switch args[0] {
+	case "resolve":
+		printResolveUsage()
+	case "--all", "all":
+		printAllUsage()
+	default:
+		return fmt.Errorf("unknown help topic %q", args[0])
+	}
+	return nil
+}
+
+func printResolveUsage() {
+	name := filepath.Base(os.Args[0])
+	fmt.Printf(`Usage:
+  %s resolve [--project DIR] [--identity] [--human] COMMAND...
+
+Give exact command names, not task descriptions. Tooltruth checks only those
+names in the active PATH and its digest-bound managed store.
+
+Default JSON fields:
+  present  commands that resolve now
+  absent   valid names that do not resolve
+  invalid  unsafe or malformed names
+  limits   the strongest fact established by this call
+
+The default check executes no candidate. --identity may run only compiled-in
+version probes for recognized commands. Missing commands are data, so a valid
+query still exits 0; malformed Tooltruth usage and operational failures do not.
+`, name)
+}
+
+func printAllUsage() {
+	name := filepath.Base(os.Args[0])
+	fmt.Printf(`Tooltruth experimental and diagnostic commands:
+
   %s context [--project DIR] [--json]
   %s validate [--project DIR] [--json] -- COMMAND [ARGS...]
   %s show <tool> [--project DIR] [--json]
@@ -619,6 +675,8 @@ Usage:
   %s doctor [<tool>] [--project DIR] [--json]
   %s repair <tool> [--json]
   %s exec <managed-tool> -- [ARGS...]
-  %s version
-`, name, name, name, name, name, name, name, name, name, name)
+
+These surfaces are retained for experiments and diagnostics. They are not part
+of the minimal AI integration; use "tooltruth resolve" for normal agent work.
+`, name, name, name, name, name, name, name, name)
 }
