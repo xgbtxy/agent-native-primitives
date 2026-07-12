@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/xgbtxy/agent-native-primitives/internal/discovery"
+	contextfacts "github.com/xgbtxy/agent-native-primitives/internal/facts"
 	"github.com/xgbtxy/agent-native-primitives/internal/invocation"
 	"github.com/xgbtxy/agent-native-primitives/internal/managed"
 	"github.com/xgbtxy/agent-native-primitives/internal/model"
@@ -46,6 +47,8 @@ func run(args []string) error {
 		return runRepair(args[1:])
 	case "validate":
 		return runValidate(args[1:])
+	case "context":
+		return runContextFacts(args[1:])
 	case "exec":
 		return runManaged(args[1:])
 	case "version", "--version", "-v":
@@ -57,6 +60,27 @@ func run(args []string) error {
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
+}
+
+func runContextFacts(args []string) error {
+	jsonOutput := takeBool(&args, "--json")
+	project, err := takeValue(&args, "--project", ".")
+	if err != nil {
+		return err
+	}
+	if len(args) != 0 {
+		return fmt.Errorf("unexpected context arguments: %s", strings.Join(args, " "))
+	}
+	index, err := discovery.Scan(discovery.Options{Project: project})
+	if err != nil {
+		return err
+	}
+	bundle := contextfacts.Build(context.Background(), index, nil)
+	if jsonOutput {
+		return printJSON(bundle)
+	}
+	fmt.Println(contextfacts.Markdown(bundle))
+	return nil
 }
 
 func runValidate(args []string) error {
@@ -472,7 +496,8 @@ Usage:
   %s doctor [<tool>] [--project DIR] [--json]
   %s repair <tool> [--json]
   %s validate [--project DIR] [--json] -- COMMAND [ARGS...]
+  %s context [--project DIR] [--json]
   %s exec <managed-tool> -- [ARGS...]
   %s version
-`, name, name, name, name, name, name, name, name)
+`, name, name, name, name, name, name, name, name, name)
 }

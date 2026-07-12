@@ -6,7 +6,7 @@ Each command in this repository must do one narrow job, emit sparse and evidence
 
 | Tool | Purpose | Status |
 |---|---|---|
-| `tooltruth` | Resolve local CLI capabilities and validate proposed flags against digest-bound local help evidence. | Experimental |
+| `tooltruth` | Emit a compact, live local-command fact header that an AI host can inject before the model's first turn. | Experimental |
 
 New tools are added only when a focused capability is not already served well by a mature project. This is not an agent framework and will not reimplement standard Unix utilities.
 
@@ -17,6 +17,8 @@ Tooltruth is an experimental, local-first capability resolver for AI agents. It 
 > In the active project and PATH scope, what capability can actually be resolved for this intent right now?
 
 Normal discovery does not execute programs or persist a machine inventory. Explicit, curated commands can diagnose, repair, and run a managed tool without changing global PATH. Tooltruth does not run an agent, start a daemon, or expose environment-variable values.
+
+The strongest measured direction is now `tooltruth context`: generate local presence and version facts once, then let the AI host inject them before the first model turn. This avoids making the model remember or call another utility. The initial local behavior experiment is documented in [docs/local-ai-context-experiment-2026-07-12.md](docs/local-ai-context-experiment-2026-07-12.md).
 
 The competitive boundary is recorded in [docs/research.md](docs/research.md). Current local-machine results, including a failed initial A/B and the corrected epistemic contract, are in [docs/local-smoke-2026-07-11.md](docs/local-smoke-2026-07-11.md).
 
@@ -51,12 +53,36 @@ go run ./cmd/tooltruth find "搜索 panic 日志并显示上下文" --project . 
 go run ./cmd/tooltruth show rg --project . --json
 go run ./cmd/tooltruth doctor --project .
 go run ./cmd/tooltruth doctor binwalk --json
+go run ./cmd/tooltruth context --project .
 go run ./cmd/tooltruth validate --json -- gh pr create --title hello
 go run ./cmd/tooltruth repair binwalk --json
 go run ./cmd/tooltruth exec binwalk -- firmware.bin
 ```
 
 Every command resolves the current project and PATH live. No index is written to disk.
+
+## Compact AI environment facts
+
+```text
+tooltruth context --project .
+```
+
+Example output from the current machine is about 130 tokens:
+
+```text
+Verified local command facts (scope ...; trust presence/version without re-checking):
+- PATH-resolved: gh@2.91.0, go@1.23.4, jq@1.8.1, rg@15.1.0, yq[mikefarah]@4.52.4, ...
+- Digest-bound managed: tooltruth exec binwalk --@3.1.0
+- Limits: presence/version only; flags, aliases, shell functions, and runtime behavior remain unknown.
+```
+
+This output is designed for host-side injection before the model's first turn. It is not a prompt asking the model to call Tooltruth. The command executes only compiled-in version probes, extracts bounded version/implementation tokens, and never forwards raw probe output into model context. On the measured machine it takes roughly 0.5 seconds and persists nothing.
+
+The contract is intentionally narrow:
+
+- A listed command and version may be trusted in the reported scope without another PATH/version check.
+- A version never proves that a flag, subcommand, alias, runtime behavior, or network operation is valid.
+- If a host cannot inject the facts automatically, making the model call Tooltruth on demand may add overhead instead of saving it.
 
 ## Experimental invocation validation
 
@@ -177,7 +203,7 @@ The descriptor is returned only when `fwx` resolves in the active PATH. The file
 
 ## Privacy and safety boundaries
 
-- Discovery never invokes an executable. Only explicit `doctor`, `validate`, and `exec` do; `repair` additionally performs an explicit network build.
+- Discovery never invokes an executable. Explicit `context` runs only fixed bounded version probes; `doctor`, `validate`, and `exec` have their separately documented execution boundaries; `repair` additionally performs an explicit network build.
 - No PATH inventory or project task body is persisted.
 - Health history contains only tool ID, executable digest, probe ID, status, and timestamp; raw output is not persisted.
 - Default `find --json` output omits full paths, environment metadata, risk labels, internal scores, and pseudo-confidence.

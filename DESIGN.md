@@ -12,3 +12,5 @@ Agent Native Primitives follows six constraints:
 The repository may contain many commands, but it must never become a general agent framework or package manager.
 
 Invocation validation follows an asymmetric evidence rule: an exact token observed in digest-bound local help may be reported as observed; absence is reported only as absence from that help surface, never as parser rejection. Truncated, ambiguous, unsupported, or combined-token cases abstain. User-provided values are never forwarded to a probe.
+
+Local facts should be injected by the AI host before the first model turn, not recalled through another model-decided tool call. Context facts are limited to live presence and bounded version identity. They must never imply syntax or behavior support.
