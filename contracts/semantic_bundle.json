@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "contract_version": "2026-07-12",
+  "canonical_repository": "xgbtxy/agent-native-primitives",
+  "command_ids": [
+    "tooltruth.resolve",
+    "tooltruth.validate",
+    "tooltruth.context",
+    "tooltruth.version",
+    "tooltruth.find",
+    "tooltruth.show",
+    "tooltruth.doctor",
+    "tooltruth.repair",
+    "tooltruth.exec"
+  ],
+  "signal_ids": [
+    "path_resolved",
+    "path+version_observed",
+    "managed_digest_matched",
+    "absent",
+    "observed_in_local_help",
+    "not_observed_in_local_help",
+    "abstain",
+    "version_reported",
+    "project_descriptor_observed",
+    "fixed_probe_passed",
+    "repair_completed",
+    "managed_exec_completed",
+    "error"
+  ],
+  "lifecycle_status": [
+    "candidate",
+    "testing",
+    "deferred",
+    "registered",
+    "quarantined",
+    "deprecated",
+    "retired",
+    "rejected"
+  ],
+  "implementation_strategy": [
+    "adopt",
+    "adapt",
+    "invent"
+  ],
+  "decision_values": [
+    "adopt",
+    "adapt",
+    "invent",
+    "defer",
+    "reject"
+  ],
+  "exit_code_semantics": {
+    "structured_result": "0",
+    "usage_or_operational_error": "1",
+    "candidate_execution": "never implied by a structured result"
+  },
+  "safety_rule_ids": [
+    "default_network_disabled",
+    "default_workspace_scoped_writes",
+    "no_ambient_secret_capture",
+    "no_untrusted_candidate_execution",
+    "bounded_output",
+    "bounded_timeout",
+    "explicit_higher_authority_action"
+  ]
+}

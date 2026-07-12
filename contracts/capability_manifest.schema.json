@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Native Capability Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "identity",
+    "decision",
+    "trigger",
+    "execution",
+    "evidence",
+    "scope",
+    "stewardship",
+    "delivery"
+  ],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "required": ["capability_id", "contract_version", "artifact_version", "artifact_fingerprint"],
+      "properties": {
+        "capability_id": { "type": "string" },
+        "contract_version": { "type": "string" },
+        "artifact_version": { "type": "string" },
+        "artifact_fingerprint": { "type": "string", "pattern": "^[A-Za-z0-9:_-]{8,200}$" }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": ["implementation_strategy", "lifecycle_status"],
+      "properties": {
+        "implementation_strategy": { "enum": ["adopt", "adapt", "invent"] },
+        "lifecycle_status": { "enum": ["candidate", "testing", "deferred", "registered", "quarantined", "deprecated", "retired", "rejected"] }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["signal_id", "observable_fact", "call_when", "do_not_call_when", "stop"],
+      "properties": {
+        "signal_id": { "type": "string" },
+        "observable_fact": { "type": "string" },
+        "call_when": { "type": "string" },
+        "do_not_call_when": { "type": "string" },
+        "stop": { "type": "string" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["command_id", "network", "filesystem_writes", "subprocesses", "required_environment", "working_directory", "timeout_ms", "max_output_bytes", "nondeterminism", "cleanup", "authority"],
+      "properties": {
+        "command_id": { "type": "string" },
+        "input_schema_ref": { "type": "string" },
+        "output_schema_ref": { "type": "string" },
+        "exit_codes": { "type": "object" },
+        "network": { "enum": ["disabled", "opt_in", "enabled"] },
+        "filesystem_writes": { "type": "string" },
+        "subprocesses": { "type": "string" },
+        "required_environment": { "type": "string" },
+        "working_directory": { "type": "string" },
+        "timeout_ms": { "type": "integer", "minimum": 1 },
+        "max_output_bytes": { "type": "integer", "minimum": 1 },
+        "nondeterminism": { "type": "string" },
+        "cleanup": { "type": "string" },
+        "authority": { "type": "string" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["observation_refs", "primary_source_refs", "safety_probe_ref", "intrinsic_benchmark_ref", "retrieval_benchmark_ref"],
+      "properties": {
+        "observation_refs": { "type": "array", "items": { "type": "string" } },
+        "primary_source_refs": { "type": "array", "items": { "type": "string" } },
+        "safety_probe_ref": { "type": "string" },
+        "intrinsic_benchmark_ref": { "type": "string" },
+        "retrieval_benchmark_ref": { "type": "string" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["compatibility", "conflicts_with", "replaces"],
+      "properties": {
+        "compatibility": { "type": "array", "items": { "type": "string" } },
+        "conflicts_with": { "type": "array", "items": { "type": "string" } },
+        "replaces": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "stewardship": {
+      "type": "object",
+      "required": ["owner", "verified_at", "expires_at"],
+      "properties": {
+        "owner": { "type": "string" },
+        "verified_at": { "type": "string" },
+        "expires_at": { "type": "string" }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "required": ["release_ref", "rollback_ref", "replacement_ref", "canonical_semantics_hash"],
+      "properties": {
+        "release_ref": { "type": "string" },
+        "rollback_ref": { "type": "string" },
+        "replacement_ref": { "type": ["string", "null"] },
+        "canonical_semantics_hash": { "type": "string" }
+      }
+    }
+  }
+}

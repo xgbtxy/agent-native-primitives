@@ -5,6 +5,16 @@ tool_id: tooltruth
 purpose: resolve exact local command availability and emit bounded evidence for AI agents
 source: this repository
 primary_signal: path_resolved
+signal_ids:
+- tooltruth.resolve.availability
+- tooltruth.validate.help_surface
+- tooltruth.context.bounded_facts
+- tooltruth.version.identity
+- tooltruth.find.legacy_semantic
+- tooltruth.show.project_descriptor
+- tooltruth.doctor.managed_health
+- tooltruth.repair.explicit_action
+- tooltruth.exec.managed_action
 
 ## Call Contract
 
@@ -53,6 +63,21 @@ Tooltruth does not prove:
 ## Safety
 
 Discovery is read-only and does not persist a machine inventory. context is opt-in. doctor, repair, and exec are explicit higher-authority paths. Never pass secrets or untrusted shell text through the command contract.
+
+## Execution Envelope
+
+network_default: disabled
+filesystem_writes: none for discovery and validation; managed paths are explicit actions
+subprocesses: fixed probes only unless managed execution is explicitly selected
+working_directory: current project or explicit project argument
+timeout: bounded by the implementation
+output_limit: bounded; raw probe output is not part of the public signal
+cleanup: no background process; managed actions own their cleanup
+authority: local command discovery and explicitly managed actions only
+
+## Registry Admission Status
+
+Tooltruth is an experimental candidate. Passing unit tests and clean local smoke do not prove intrinsic AI utility or retrieval utility. Those require separate blind experiments with held-out tasks and abstention controls.
 
 ## Deep Source
 
