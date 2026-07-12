@@ -235,6 +235,39 @@ func TestWindowsPathExtensionPrecedence(t *testing.T) {
 	}
 }
 
+func TestResolveExactBatchPreservesQueriesAndTruthStates(t *testing.T) {
+	bin := t.TempDir()
+	project := t.TempDir()
+	home := t.TempDir()
+	createCommand(t, bin, "rg")
+	createCommand(t, bin, "opaque-tool")
+	_, results, err := ResolveExactBatch(
+		[]string{"rg", "opaque-tool", "missing-tool", "../unsafe", "rg"},
+		Options{Project: project, PathEnv: bin, PathExt: testPathExt(), ManagedHome: home},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 5 {
+		t.Fatalf("unexpected results: %#v", results)
+	}
+	if results[0].Status != "present" || results[0].Tool.ID != "ripgrep" || results[0].Tool.ResolvedPath == "" {
+		t.Fatalf("known exact command was not resolved: %#v", results[0])
+	}
+	if results[1].Status != "present" || results[1].Tool.Status != "present_unclassified" {
+		t.Fatalf("opaque exact command was overstated or lost: %#v", results[1])
+	}
+	if results[2].Status != "absent" || results[2].Tool.ResolvedPath != "" {
+		t.Fatalf("missing command was not reported absent: %#v", results[2])
+	}
+	if results[3].Status != "invalid_name" {
+		t.Fatalf("unsafe command name was accepted: %#v", results[3])
+	}
+	if results[4].Status != "present" {
+		t.Fatalf("input order or duplicate query was lost: %#v", results[4])
+	}
+}
+
 func pathsEqual(left, right string) bool {
 	if runtime.GOOS == "windows" {
 		return strings.EqualFold(left, right)

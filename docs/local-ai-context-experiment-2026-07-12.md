@@ -1,5 +1,7 @@
 # Local AI context experiment — 2026-07-12
 
+> Follow-up: this experiment proves that verified local facts can reduce environment search, but unconditional injection is no longer the default product route. See [on-demand-resolve-experiment-2026-07-12.md](on-demand-resolve-experiment-2026-07-12.md).
+
 ## Question
 
 Does an AI become more efficient when it can call a local capability CLI, or when a small set of verified local facts is injected before its first turn?
@@ -52,13 +54,13 @@ Many failed calls came from the benchmark host rejecting generated PowerShell fo
 
 ## Product decision
 
-Continue only the following narrow experiment:
+Retain the following only as an optional host experiment:
 
 ```text
 tooltruth context [--project DIR] [--json]
 ```
 
-An AI host or launcher should run it before the first model turn and inject the result automatically. The model should not have to remember Tooltruth. The output may establish only:
+An AI host or launcher may inject it only when a host-specific A/B justifies the fixed cost. The primary route is now model-decided exact candidate resolution. The output may establish only:
 
 - command presence in the active PATH scope;
 - digest-bound Tooltruth-managed presence;

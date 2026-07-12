@@ -88,61 +88,73 @@ func (OSRunner) Run(parent context.Context, path string, args []string) RunOutpu
 }
 
 func Build(ctx context.Context, index model.Index, runner Runner) Bundle {
+	var tools []model.Tool
+	for _, tool := range index.Tools {
+		if tool.ProjectDefined || (tool.Status != "present" && tool.Status != "ready") || tool.ResolvedPath == "" {
+			continue
+		}
+		tools = append(tools, tool)
+	}
+	return Observe(ctx, model.ResultScope{ID: index.Scope.ID, Project: index.Scope.ProjectName}, tools, runner)
+}
+
+func Presence(scope model.ResultScope, tools []model.Tool) Bundle {
+	result := make([]CommandFact, len(tools))
+	for i, tool := range tools {
+		result[i] = baseFact(tool)
+	}
+	return Bundle{
+		Scope:    scope,
+		Commands: result,
+		Limits: []string{
+			"presence only",
+			"versions, flags, aliases, shell functions, and runtime behavior are not verified",
+		},
+	}
+}
+
+func Observe(ctx context.Context, scope model.ResultScope, tools []model.Tool, runner Runner) Bundle {
 	ctx, cancel := context.WithTimeout(ctx, bundleTimeout)
 	defer cancel()
 	if runner == nil {
 		runner = OSRunner{}
 	}
-	type candidate struct {
-		tool model.Tool
-		spec probeSpec
-	}
-	var candidates []candidate
-	var result []CommandFact
-	for _, tool := range index.Tools {
-		if tool.ProjectDefined || (tool.Status != "present" && tool.Status != "ready") || tool.ResolvedPath == "" {
-			continue
-		}
+	result := make([]CommandFact, len(tools))
+	var wait sync.WaitGroup
+	limit := make(chan struct{}, 4)
+	for i, tool := range tools {
 		fact := baseFact(tool)
 		if tool.Version != "" {
 			fact.Version = tool.Version
-			result = append(result, fact)
+			result[i] = fact
 			continue
 		}
 		spec, ok := probes[tool.ID]
 		if !ok {
-			result = append(result, fact)
+			result[i] = fact
 			continue
 		}
-		candidates = append(candidates, candidate{tool: tool, spec: spec})
-	}
-
-	observed := make([]CommandFact, len(candidates))
-	var wait sync.WaitGroup
-	limit := make(chan struct{}, 4)
-	for i, item := range candidates {
 		wait.Add(1)
-		go func(i int, item candidate) {
+		go func(i int, tool model.Tool, spec probeSpec) {
 			defer wait.Done()
 			limit <- struct{}{}
 			defer func() { <-limit }()
-			fact := baseFact(item.tool)
-			output := runner.Run(ctx, item.tool.ResolvedPath, item.spec.Args)
+			fact := baseFact(tool)
+			output := runner.Run(ctx, tool.ResolvedPath, spec.Args)
 			if !output.TimedOut && output.ExitCode == 0 {
-				fact.Version = extractVersion(item.tool.ID, output.Text)
-				fact.Implementation = identifyImplementation(item.tool.ID, output.Text)
+				fact.Version = extractVersion(tool.ID, output.Text)
+				fact.Implementation = identifyImplementation(tool.ID, output.Text)
 				if fact.Version != "" || fact.Implementation != "" {
 					fact.Evidence = "path_resolved+fixed_version_probe"
 				}
 			}
-			observed[i] = fact
-		}(i, item)
+			result[i] = fact
+		}(i, tool, spec)
 	}
 	wait.Wait()
-	result = append(result, observed...)
 
 	return Bundle{
-		Scope:    model.ResultScope{ID: index.Scope.ID, Project: index.Scope.ProjectName},
+		Scope:    scope,
 		Commands: result,
 		Limits: []string{
 			"presence and version identity only",

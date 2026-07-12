@@ -49,6 +49,8 @@ func run(args []string) error {
 		return runValidate(args[1:])
 	case "context":
 		return runContextFacts(args[1:])
+	case "resolve":
+		return runResolve(args[1:])
 	case "exec":
 		return runManaged(args[1:])
 	case "version", "--version", "-v":
@@ -59,6 +61,118 @@ func run(args []string) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
+	}
+}
+
+type resolveOutput struct {
+	Scope   string            `json:"scope"`
+	Present []resolvedCommand `json:"present"`
+	Absent  []string          `json:"absent"`
+	Invalid []string          `json:"invalid,omitempty"`
+	Limits  string            `json:"limits"`
+}
+
+type resolvedCommand struct {
+	Command        string `json:"command"`
+	Version        string `json:"version,omitempty"`
+	Implementation string `json:"implementation,omitempty"`
+	Signal         string `json:"signal"`
+}
+
+func runResolve(args []string) error {
+	humanOutput := takeBool(&args, "--human")
+	identityOutput := takeBool(&args, "--identity")
+	_ = takeBool(&args, "--json")
+	project, err := takeValue(&args, "--project", ".")
+	if err != nil {
+		return err
+	}
+	args = uniqueCommands(args)
+	if len(args) == 0 {
+		return errors.New("resolve requires one or more exact command names")
+	}
+	if len(args) > 32 {
+		return errors.New("resolve accepts at most 32 command names")
+	}
+	scope, resolutions, err := discovery.ResolveExactBatch(args, discovery.Options{Project: project})
+	if err != nil {
+		return err
+	}
+	tools := make([]model.Tool, 0, len(resolutions))
+	absent := make([]string, 0)
+	invalid := make([]string, 0)
+	for _, resolution := range resolutions {
+		switch resolution.Status {
+		case "present":
+			tools = append(tools, resolution.Tool)
+		case "absent":
+			absent = append(absent, resolution.Query)
+		default:
+			invalid = append(invalid, resolution.Query)
+		}
+	}
+	resultScope := model.ResultScope{ID: scope.ID, Project: scope.ProjectName}
+	bundle := contextfacts.Presence(resultScope, tools)
+	limits := "presence_only"
+	if identityOutput {
+		bundle = contextfacts.Observe(context.Background(), resultScope, tools, nil)
+		limits = "presence_version_only"
+	}
+	present := make([]resolvedCommand, 0, len(bundle.Commands))
+	for _, fact := range bundle.Commands {
+		signal := "path_resolved"
+		switch fact.Evidence {
+		case "path_resolved+fixed_version_probe":
+			signal = "path+version_observed"
+		case "managed_manifest+digest":
+			signal = "managed_digest_matched"
+		}
+		present = append(present, resolvedCommand{
+			Command: fact.Command, Version: fact.Version,
+			Implementation: fact.Implementation, Signal: signal,
+		})
+	}
+	result := resolveOutput{Scope: resultScope.ID, Present: present, Absent: absent, Invalid: invalid, Limits: limits}
+	if humanOutput {
+		printResolveHuman(result)
+		return nil
+	}
+	return printCompactJSON(result)
+}
+
+func uniqueCommands(commands []string) []string {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(commands))
+	for _, command := range commands {
+		key := command
+		if runtime.GOOS == "windows" {
+			key = strings.ToLower(key)
+		}
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, command)
+	}
+	return result
+}
+
+func printResolveHuman(result resolveOutput) {
+	for _, fact := range result.Present {
+		identity := fact.Command
+		if fact.Implementation != "" {
+			identity += " [" + fact.Implementation + "]"
+		}
+		if fact.Version != "" {
+			identity += " " + fact.Version
+		}
+		fmt.Println("present", identity)
+	}
+	for _, command := range result.Absent {
+		fmt.Println("absent", command)
+	}
+	for _, command := range result.Invalid {
+		fmt.Println("invalid", command)
 	}
 }
 
@@ -485,19 +599,26 @@ func printJSON(value any) error {
 	return encoder.Encode(value)
 }
 
+func printCompactJSON(value any) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetEscapeHTML(false)
+	return encoder.Encode(value)
+}
+
 func printUsage() {
 	name := filepath.Base(os.Args[0])
-	fmt.Printf(`Tooltruth resolves active local CLI capabilities for AI agents.
+	fmt.Printf(`Tooltruth filters AI-proposed command names against live local facts.
 
 Usage:
+  %s resolve [--project DIR] [--identity] [--human] COMMAND...
+  %s context [--project DIR] [--json]
+  %s validate [--project DIR] [--json] -- COMMAND [ARGS...]
+  %s show <tool> [--project DIR] [--json]
   %s scan [--project DIR] [--json]
   %s find <intent> [--project DIR] [--json]
-  %s show <tool> [--project DIR] [--json]
   %s doctor [<tool>] [--project DIR] [--json]
   %s repair <tool> [--json]
-  %s validate [--project DIR] [--json] -- COMMAND [ARGS...]
-  %s context [--project DIR] [--json]
   %s exec <managed-tool> -- [ARGS...]
   %s version
-`, name, name, name, name, name, name, name, name, name)
+`, name, name, name, name, name, name, name, name, name, name)
 }

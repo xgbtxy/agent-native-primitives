@@ -11,6 +11,7 @@ import (
 	"github.com/xgbtxy/agent-native-primitives/internal/model"
 	"github.com/xgbtxy/agent-native-primitives/internal/tooling"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -130,24 +131,169 @@ func scanDescriptors(options Options, resolver *pathResolver) ([]model.Tool, err
 // an agent to ask whether an opaque command name resolves without persisting a
 // whole-machine PATH inventory.
 func ResolveExact(command string, options Options) (model.Tool, bool, error) {
-	command = strings.TrimSpace(command)
-	if !exactCommand.MatchString(command) {
-		return model.Tool{}, false, nil
-	}
-	options, _, err := normalize(options)
+	_, results, err := ResolveExactBatch([]string{command}, options)
 	if err != nil {
 		return model.Tool{}, false, err
 	}
-	path, ok := newPathResolver(options).resolve(command)
-	if !ok {
+	if len(results) != 1 || results[0].Status != "present" {
 		return model.Tool{}, false, nil
 	}
-	return model.Tool{
-		ID: command, Family: command, Command: command, ResolvedPath: path,
+	return results[0].Tool, true, nil
+}
+
+type ExactResolution struct {
+	Query  string
+	Status string
+	Tool   model.Tool
+}
+
+// ResolveExactBatch resolves only caller-supplied command names. It checks only
+// those names across PATH, preserves input order, and never executes them.
+func ResolveExactBatch(commands []string, options Options) (model.Scope, []ExactResolution, error) {
+	useNativePath := options.PathEnv == "" && options.PathExt == ""
+	options, scope, err := normalize(options)
+	if err != nil {
+		return model.Scope{}, nil, err
+	}
+	keyResolver := &pathResolver{extensions: windowsExtensions(options.PathExt)}
+
+	results := make([]ExactResolution, len(commands))
+	for i, raw := range commands {
+		results[i] = resolveExactOne(strings.TrimSpace(raw), options, keyResolver, useNativePath)
+	}
+	return scope, results, nil
+}
+
+func resolveExactOne(query string, options Options, keyResolver *pathResolver, useNativePath bool) ExactResolution {
+	result := ExactResolution{Query: query, Status: "absent"}
+	if !exactCommand.MatchString(query) {
+		result.Status = "invalid_name"
+		return result
+	}
+	key := keyResolver.key(query)
+	entry, known := catalog.ByCommand(key)
+	if known && tooling.Supports(entry.ID) {
+		if tool, ok := resolveManagedExact(entry, options.ManagedHome); ok {
+			result.Status = "present"
+			result.Tool = tool
+			return result
+		}
+	}
+	path, present := "", false
+	if useNativePath {
+		var err error
+		path, err = exec.LookPath(query)
+		present = err == nil
+	} else {
+		path, present = resolveExactPath(query, options)
+	}
+	if !present {
+		return result
+	}
+	result.Status = "present"
+	if known {
+		result.Tool = toolFromEntry(entry, query, path)
+		return result
+	}
+	result.Tool = model.Tool{
+		ID: query, Family: query, Command: query, ResolvedPath: path,
 		Status: "present_unclassified", SemanticSource: "none", ResolverSource: "path",
 		Description: "The exact command name resolves in the active PATH; its capability is unknown.",
 		Risk:        "unknown",
-	}, true, nil
+	}
+	return result
+}
+
+func resolveManagedExact(entry catalog.Entry, home string) (model.Tool, bool) {
+	record, ok, err := managed.Load(home, entry.ID)
+	if err != nil || !ok || !managedRecipeMatches(entry.ID, record.Manifest) {
+		return model.Tool{}, false
+	}
+	health, ok, err := managed.LoadHealth(home, entry.ID, record.Manifest.SHA256, tooling.BinwalkProbeID)
+	if err != nil || !ok || health.Status != "ready" {
+		return model.Tool{}, false
+	}
+	tool := toolFromEntry(entry, "tooltruth exec "+entry.ID+" --", record.Path)
+	tool.Status = "ready"
+	tool.ResolverSource = "managed_digest_matched"
+	tool.Managed = true
+	tool.Version = record.Manifest.Version
+	tool.VerifiedAt = health.CheckedAt
+	tool.Examples = managedExamples(entry, tool.Command)
+	return tool, true
+}
+
+func resolveExactPath(command string, options Options) (string, bool) {
+	extensions := windowsExtensionOrder(options.PathExt)
+	for _, dir := range filepath.SplitList(options.PathEnv) {
+		dir = strings.TrimSpace(strings.Trim(dir, `"`))
+		if dir == "" {
+			continue
+		}
+		if runtime.GOOS != "windows" {
+			path := filepath.Join(dir, command)
+			info, err := os.Stat(path)
+			if err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0 {
+				return path, true
+			}
+			continue
+		}
+
+		extension := strings.ToLower(filepath.Ext(command))
+		knownExtension := false
+		for _, candidateExtension := range extensions {
+			if extension == strings.ToLower(candidateExtension) {
+				knownExtension = true
+				break
+			}
+		}
+		if knownExtension {
+			path := filepath.Join(dir, command)
+			if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+				return path, true
+			}
+			continue
+		}
+		for _, candidateExtension := range extensions {
+			path := filepath.Join(dir, command+candidateExtension)
+			if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+				return path, true
+			}
+		}
+		path := filepath.Join(dir, command)
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() && hasExecutableHeader(path) {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func windowsExtensionOrder(pathExt string) []string {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	extensions := filepath.SplitList(pathExt)
+	if len(extensions) == 0 {
+		extensions = []string{".COM", ".EXE", ".BAT", ".CMD"}
+	}
+	result := make([]string, 0, len(extensions))
+	seen := map[string]bool{}
+	for _, extension := range extensions {
+		extension = strings.TrimSpace(extension)
+		if extension == "" {
+			continue
+		}
+		if !strings.HasPrefix(extension, ".") {
+			extension = "." + extension
+		}
+		key := strings.ToLower(extension)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		result = append(result, extension)
+	}
+	return result
 }
 
 func normalize(options Options) (Options, model.Scope, error) {

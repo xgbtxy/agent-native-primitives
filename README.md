@@ -6,7 +6,7 @@ Each command in this repository must do one narrow job, emit sparse and evidence
 
 | Tool | Purpose | Status |
 |---|---|---|
-| `tooltruth` | Emit a compact, live local-command fact header that an AI host can inject before the model's first turn. | Experimental |
+| `tooltruth` | Filter AI-proposed command names against the live local PATH and return sparse evidence. | Experimental |
 
 New tools are added only when a focused capability is not already served well by a mature project. This is not an agent framework and will not reimplement standard Unix utilities.
 
@@ -14,11 +14,11 @@ New tools are added only when a focused capability is not already served well by
 
 Tooltruth is an experimental, local-first capability resolver for AI agents. It asks:
 
-> In the active project and PATH scope, what capability can actually be resolved for this intent right now?
+> Which exact command names proposed by the AI resolve in the active local scope right now?
 
 Normal discovery does not execute programs or persist a machine inventory. Explicit, curated commands can diagnose, repair, and run a managed tool without changing global PATH. Tooltruth does not run an agent, start a daemon, or expose environment-variable values.
 
-The strongest measured direction is now `tooltruth context`: generate local presence and version facts once, then let the AI host inject them before the first model turn. This avoids making the model remember or call another utility. The initial local behavior experiment is documented in [docs/local-ai-context-experiment-2026-07-12.md](docs/local-ai-context-experiment-2026-07-12.md).
+The primary interface is now `tooltruth resolve`: the model supplies a short candidate list, Tooltruth checks only those exact names, and the model remains responsible for semantic choice. There is no intent-keyword search in this path and no automatic environment injection. The first behavior experiment is documented in [docs/on-demand-resolve-experiment-2026-07-12.md](docs/on-demand-resolve-experiment-2026-07-12.md).
 
 The competitive boundary is recorded in [docs/research.md](docs/research.md). Current local-machine results, including a failed initial A/B and the corrected epistemic contract, are in [docs/local-smoke-2026-07-11.md](docs/local-smoke-2026-07-11.md).
 
@@ -48,6 +48,8 @@ The initial packages are not signed with commercial Windows or Apple developer c
 ## Current experimental CLI
 
 ```powershell
+go run ./cmd/tooltruth resolve yq jq python
+go run ./cmd/tooltruth resolve --identity yq
 go run ./cmd/tooltruth scan --project .
 go run ./cmd/tooltruth find "搜索 panic 日志并显示上下文" --project . --json
 go run ./cmd/tooltruth show rg --project . --json
@@ -61,7 +63,40 @@ go run ./cmd/tooltruth exec binwalk -- firmware.bin
 
 Every command resolves the current project and PATH live. No index is written to disk.
 
-## Compact AI environment facts
+## On-demand exact resolution
+
+The AI proposes concrete candidates and calls one entry only when local availability is uncertain:
+
+```text
+tooltruth resolve yq jq python definitely-not-installed
+```
+
+Default output is compact JSON and does not execute any candidate:
+
+```json
+{"scope":"...","present":[{"command":"yq","signal":"path_resolved"},{"command":"jq","signal":"path_resolved"},{"command":"python","signal":"path_resolved"}],"absent":["definitely-not-installed"],"limits":"presence_only"}
+```
+
+When implementation identity matters, the AI may opt into fixed bounded version probes:
+
+```text
+tooltruth resolve --identity yq jq python
+```
+
+```json
+{"scope":"...","present":[{"command":"yq","version":"4.52.4","implementation":"mikefarah","signal":"path+version_observed"}],"absent":[],"limits":"presence_version_only"}
+```
+
+Rules:
+
+- Inputs are exact command names, not task keywords or natural-language intents.
+- At most 32 names are accepted; duplicates are removed and output order is stable.
+- Default resolution checks only PATH or a digest-bound managed record and executes nothing.
+- `--identity` executes only compiled-in version probes and never returns raw probe output.
+- Missing and invalid names are structured results with a successful process exit; operational failures exit nonzero.
+- The AI should call this only for unfamiliar candidates, version-sensitive choices, or before installing a missing tool—not before every shell command.
+
+## Optional compact environment facts
 
 ```text
 tooltruth context --project .
@@ -76,13 +111,13 @@ Verified local command facts (scope ...; trust presence/version without re-check
 - Limits: presence/version only; flags, aliases, shell functions, and runtime behavior remain unknown.
 ```
 
-This output is designed for host-side injection before the model's first turn. It is not a prompt asking the model to call Tooltruth. The command executes only compiled-in version probes, extracts bounded version/implementation tokens, and never forwards raw probe output into model context. On the measured machine it takes roughly 0.5 seconds and persists nothing.
+`context` remains an opt-in host experiment, not the default integration. It executes only compiled-in version probes, extracts bounded version/implementation tokens, and never forwards raw probe output into model context. On the measured machine it takes roughly 0.5 seconds and persists nothing.
 
 The contract is intentionally narrow:
 
 - A listed command and version may be trusted in the reported scope without another PATH/version check.
 - A version never proves that a flag, subcommand, alias, runtime behavior, or network operation is valid.
-- If a host cannot inject the facts automatically, making the model call Tooltruth on demand may add overhead instead of saving it.
+- Unconditional injection imposes a fixed cost on tasks that do not need environment discovery; prefer `resolve` unless a host-specific A/B proves injection useful.
 
 ## Experimental invocation validation
 
@@ -107,7 +142,9 @@ The result language is deliberately asymmetric:
 
 This feature is on `main` for measurement and is not included in the v0.1.0 binary release. Its preregistered keep/kill test is in [docs/invocation-validation-experiment.md](docs/invocation-validation-experiment.md).
 
-## Agent output contract
+## Legacy semantic discovery experiment
+
+`find` predates the exact-name resolver and is not the primary product path. It remains temporarily available for comparison while real-agent tests determine whether it should be removed.
 
 `find --json` returns exactly one `match` or `null`. It never returns a ranked list:
 
@@ -160,8 +197,9 @@ This is an explicit network build, not a sandbox. Build scripts run with the cur
 This instruction is an experiment, not a proven default:
 
 ```text
-When a task may benefit from an unfamiliar local or project-specific CLI,
-run: tooltruth find "<intent>" --project . --json
+When local availability of one or more concrete CLI candidates is uncertain,
+run once: tooltruth resolve <candidate>...
+Add --identity only when version or implementation affects the decision.
 ```
 
 Do not instruct an agent to call Tooltruth before every shell action. The A/B protocol must measure useful calls and unnecessary-call overhead.
@@ -208,7 +246,7 @@ The descriptor is returned only when `fwx` resolves in the active PATH. The file
 - Health history contains only tool ID, executable digest, probe ID, status, and timestamp; raw output is not persisted.
 - Default `find --json` output omits full paths, environment metadata, risk labels, internal scores, and pseudo-confidence.
 - One capability family can produce at most one signal, and the public contract returns only the strongest supported match.
-- `show <tool>` explicitly reveals the resolved path for diagnostics.
+- `resolve` omits full paths; `show <tool>` explicitly reveals one resolved path for diagnostics.
 - Package-script bodies are not copied into semantic metadata.
 - Missing runtimes are visible to diagnostics but never recommended by `find`.
 
@@ -220,6 +258,8 @@ Product value must be established with the preregistered external A/B design in 
 
 ## Non-goals
 
+- Natural-language or keyword matching in the primary `resolve` path
+- Calling Tooltruth before every shell command
 - Automatic repair or probing during `find`
 - General-purpose package management; repair is limited to compiled-in recipes
 - MCP or Skills marketplace

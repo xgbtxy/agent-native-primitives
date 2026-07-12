@@ -13,4 +13,4 @@ The repository may contain many commands, but it must never become a general age
 
 Invocation validation follows an asymmetric evidence rule: an exact token observed in digest-bound local help may be reported as observed; absence is reported only as absence from that help surface, never as parser rejection. Truncated, ambiguous, unsupported, or combined-token cases abstain. User-provided values are never forwarded to a probe.
 
-Local facts should be injected by the AI host before the first model turn, not recalled through another model-decided tool call. Context facts are limited to live presence and bounded version identity. They must never imply syntax or behavior support.
+The model owns semantic choice and may query exact candidate names only when local uncertainty justifies the call. Default resolution is presence-only and executes nothing. Version identity is explicit opt-in and must never imply syntax or behavior support. Automatic context injection is optional and requires separate host-specific evidence.
