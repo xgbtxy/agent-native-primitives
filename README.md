@@ -6,7 +6,7 @@ Each command in this repository must do one narrow job, emit sparse and evidence
 
 | Tool | Purpose | Status |
 |---|---|---|
-| `tooltruth` | Resolve what local CLI capability is actually available for an intent, diagnose curated tools, and isolate repairs. | Experimental |
+| `tooltruth` | Resolve local CLI capabilities and validate proposed flags against digest-bound local help evidence. | Experimental |
 
 New tools are added only when a focused capability is not already served well by a mature project. This is not an agent framework and will not reimplement standard Unix utilities.
 
@@ -51,11 +51,35 @@ go run ./cmd/tooltruth find "搜索 panic 日志并显示上下文" --project . 
 go run ./cmd/tooltruth show rg --project . --json
 go run ./cmd/tooltruth doctor --project .
 go run ./cmd/tooltruth doctor binwalk --json
+go run ./cmd/tooltruth validate --json -- gh pr create --title hello
 go run ./cmd/tooltruth repair binwalk --json
 go run ./cmd/tooltruth exec binwalk -- firmware.bin
 ```
 
 Every command resolves the current project and PATH live. No index is written to disk.
+
+## Experimental invocation validation
+
+`validate` checks a proposed invocation before an agent runs it:
+
+```text
+tooltruth validate --json -- gh pr create --title hello
+tooltruth validate --json -- git status --short
+tooltruth validate --json -- rg --glob "*.go" needle
+```
+
+The `--` separator is mandatory. Tooltruth discards all user-provided values when probing and executes only a compiled-in help recipe. The pilot supports leaf surfaces of `rg`, `fd`/`fdfind`, `jq`, `curl`, and `binwalk`, plus a small exact-path set for `gh`, `git`, `go`, and `uv`. Unknown commands, non-whitelisted command paths, external CLI plugins, ambiguous subcommand paths, incompatible `yq` variants, Docker, and interpreter-owned script arguments cause an abstention without execution.
+
+The result language is deliberately asymmetric:
+
+- `observed_in_local_help` means the exact flag token appeared in help produced by the currently resolved executable.
+- `not_observed_in_local_help` is not a claim that the parser rejects the flag; help completeness is explicitly `unknown`.
+- Positional values, shell aliases, runtime behavior, and command success are never claimed.
+- Evidence includes the executable SHA-256, sanitized probe argv, help-output SHA-256, byte count, exit code, and truncation state. Raw help is not persisted.
+- Passthrough subcommands such as `go run`, `docker exec`, and `uv run` abstain because another parser may own later flags.
+- Structured evidence statuses exit zero; malformed Tooltruth usage and operational failures exit nonzero. Callers must branch on the JSON `status`, not process success alone.
+
+This feature is on `main` for measurement and is not included in the v0.1.0 binary release. Its preregistered keep/kill test is in [docs/invocation-validation-experiment.md](docs/invocation-validation-experiment.md).
 
 ## Agent output contract
 
@@ -153,7 +177,7 @@ The descriptor is returned only when `fwx` resolves in the active PATH. The file
 
 ## Privacy and safety boundaries
 
-- Discovery never invokes an executable. Only explicit `doctor` and `exec` do.
+- Discovery never invokes an executable. Only explicit `doctor`, `validate`, and `exec` do; `repair` additionally performs an explicit network build.
 - No PATH inventory or project task body is persisted.
 - Health history contains only tool ID, executable digest, probe ID, status, and timestamp; raw output is not persisted.
 - Default `find --json` output omits full paths, environment metadata, risk labels, internal scores, and pseudo-confidence.
@@ -174,6 +198,7 @@ Product value must be established with the preregistered external A/B design in 
 - General-purpose package management; repair is limited to compiled-in recipes
 - MCP or Skills marketplace
 - Agent planning or arbitrary command execution
+- Arbitrary `<command> --help` probing or a static registry of every CLI
 - Chat, memory, embeddings, or RAG
 - Background indexing service
 

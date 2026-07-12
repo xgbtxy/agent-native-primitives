@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/xgbtxy/agent-native-primitives/internal/discovery"
+	"github.com/xgbtxy/agent-native-primitives/internal/invocation"
 	"github.com/xgbtxy/agent-native-primitives/internal/managed"
 	"github.com/xgbtxy/agent-native-primitives/internal/model"
 	"github.com/xgbtxy/agent-native-primitives/internal/search"
@@ -13,11 +14,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
 
-var version = "0.1.0-dev"
+var version = "0.2.0-dev"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -42,6 +44,8 @@ func run(args []string) error {
 		return runDoctor(args[1:])
 	case "repair":
 		return runRepair(args[1:])
+	case "validate":
+		return runValidate(args[1:])
 	case "exec":
 		return runManaged(args[1:])
 	case "version", "--version", "-v":
@@ -52,6 +56,87 @@ func run(args []string) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
+	}
+}
+
+func runValidate(args []string) error {
+	separator := -1
+	for i, arg := range args {
+		if arg == "--" {
+			separator = i
+			break
+		}
+	}
+	if separator < 0 {
+		return errors.New("validate requires -- before the intended command")
+	}
+	options := append([]string(nil), args[:separator]...)
+	intended := args[separator+1:]
+	jsonOutput := takeBool(&options, "--json")
+	project, err := takeValue(&options, "--project", ".")
+	if err != nil {
+		return err
+	}
+	if len(options) != 0 {
+		return fmt.Errorf("unexpected validate options: %s", strings.Join(options, " "))
+	}
+	if len(intended) == 0 {
+		return errors.New("validate requires a command after --")
+	}
+
+	index, err := discovery.Scan(discovery.Options{Project: project})
+	if err != nil {
+		return err
+	}
+	recipe, supported := invocation.RecipeForCommand(intended[0])
+	var result invocation.Result
+	if !supported {
+		result = invocation.UnsupportedResult(intended[0], intended[1:])
+	} else {
+		tool := resolveInvocationTool(index, recipe, intended[0])
+		result = invocation.Validate(context.Background(), recipe, tool, intended[0], intended[1:], nil)
+	}
+	result.Scope = model.ResultScope{ID: index.Scope.ID, Project: index.Scope.ProjectName}
+	if jsonOutput {
+		return printJSON(result)
+	}
+	printValidation(result)
+	return nil
+}
+
+func resolveInvocationTool(index model.Index, recipe invocation.Recipe, requestedCommand string) model.Tool {
+	for _, tool := range index.Tools {
+		if tool.ID != recipe.ID {
+			continue
+		}
+		if tool.Managed || sameCommand(tool.Command, requestedCommand) {
+			return tool
+		}
+	}
+	return model.Tool{}
+}
+
+func sameCommand(left, right string) bool {
+	normalize := func(value string) string {
+		value = strings.TrimSpace(value)
+		if runtime.GOOS == "windows" {
+			value = strings.TrimSuffix(strings.ToLower(value), ".exe")
+		}
+		return value
+	}
+	return normalize(left) == normalize(right)
+}
+
+func printValidation(result invocation.Result) {
+	fmt.Println(result.Status)
+	for _, flag := range result.Flags {
+		fmt.Printf("  %s: %s\n", flag.Canonical, flag.Status)
+	}
+	if result.Evidence != nil {
+		fmt.Printf("  evidence: %s; executable_sha256=%s\n", result.Evidence.Scope, result.Evidence.ExecutableSHA256)
+	}
+	if result.Reason != "" {
+		fmt.Println("  limit:", result.Reason)
 	}
 }
 
@@ -386,7 +471,8 @@ Usage:
   %s show <tool> [--project DIR] [--json]
   %s doctor [<tool>] [--project DIR] [--json]
   %s repair <tool> [--json]
+  %s validate [--project DIR] [--json] -- COMMAND [ARGS...]
   %s exec <managed-tool> -- [ARGS...]
   %s version
-`, name, name, name, name, name, name, name)
+`, name, name, name, name, name, name, name, name)
 }

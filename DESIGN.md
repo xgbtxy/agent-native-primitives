@@ -10,3 +10,5 @@ Agent Native Primitives follows six constraints:
 6. **Evidence before expansion.** A new feature or tool needs a real external task where it beats existing primitives.
 
 The repository may contain many commands, but it must never become a general agent framework or package manager.
+
+Invocation validation follows an asymmetric evidence rule: an exact token observed in digest-bound local help may be reported as observed; absence is reported only as absence from that help surface, never as parser rejection. Truncated, ambiguous, unsupported, or combined-token cases abstain. User-provided values are never forwarded to a probe.
