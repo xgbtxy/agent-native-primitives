@@ -593,8 +593,8 @@ func scanPackageScripts(options Options, resolver *pathResolver) []model.Tool {
 			ID: manager + ":" + name, Family: "project_task", Command: command, ResolvedPath: manifest,
 			Status: status, SemanticSource: "package.json", ResolverSource: "project_manifest+path", Description: "Project-defined package script named " + name + ".",
 			Capabilities: []string{"project_task", "package_script"},
-			Intents:      []string{name, "运行项目脚本", "run project script"},
-			Examples:     []model.Example{{Intent: "运行 " + name + " 项目脚本", Command: command}},
+			Intents:      []string{name, "run project script", "execute package script"},
+			Examples:     []model.Example{{Intent: "run the " + name + " project script", Command: command}},
 			Risk:         "dangerous", ProjectDefined: true,
 		})
 	}
@@ -652,8 +652,8 @@ func scanMakefile(options Options, resolver *pathResolver) []model.Tool {
 				ID: "make:" + match[1], Family: "project_task", Command: command, ResolvedPath: path,
 				Status: status, SemanticSource: filename, ResolverSource: "project_manifest+path", Description: "Project-defined Make target named " + match[1] + ".",
 				Capabilities: []string{"project_task", "make_target"},
-				Intents:      []string{match[1], "构建项目", "运行项目任务", "run make target"},
-				Examples:     []model.Example{{Intent: "运行 " + match[1] + " target", Command: command}},
+				Intents:      []string{match[1], "build project", "run project task", "run make target"},
+				Examples:     []model.Example{{Intent: "run " + match[1] + " target", Command: command}},
 				Risk:         "dangerous", ProjectDefined: true,
 			})
 		}

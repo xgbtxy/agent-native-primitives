@@ -8,16 +8,16 @@ import (
 	"time"
 )
 
-func TestFindChineseIntentRanksRipgrepFirst(t *testing.T) {
+func TestFindIntentRanksRipgrepFirst(t *testing.T) {
 	index := model.Index{
 		GeneratedAt: time.Now(),
 		Tools: []model.Tool{
-			{ID: "git", Command: "git", Status: "present", Description: "source history", Intents: []string{"查看代码历史"}},
-			{ID: "ripgrep", Command: "rg", Status: "present", Description: "search files", Capabilities: []string{"search_logs"}, Intents: []string{"搜索日志", "显示匹配上下文"}, Examples: []model.Example{{Intent: "搜索日志并显示上下文", Command: `rg -n -C 10 "panic" error.log`}}},
+			{ID: "git", Command: "git", Status: "present", Description: "source history", Intents: []string{"inspect code history"}},
+			{ID: "ripgrep", Command: "rg", Status: "present", Description: "search files", Capabilities: []string{"search_logs"}, Intents: []string{"search logs", "show matching context"}, Examples: []model.Example{{Intent: "search logs with context", Command: `rg -n -C 10 "panic" error.log`}}},
 		},
 	}
 
-	result := Find(index, "搜索 panic 日志并显示上下文")
+	result := Find(index, "search panic logs with context")
 	if result.Match == nil {
 		t.Fatal("expected at least one candidate")
 	}
@@ -31,11 +31,11 @@ func TestFindProjectScript(t *testing.T) {
 		GeneratedAt: time.Now(),
 		Tools: []model.Tool{{
 			ID: "npm:test", Command: "npm run test", Status: "present", ProjectDefined: true,
-			Description: "Project-defined npm script: vitest run", Intents: []string{"test", "vitest run", "运行项目脚本"},
+			Description: "Project-defined npm script: vitest run", Intents: []string{"test", "vitest run", "run project script", "run project tests"},
 		}},
 	}
 
-	result := Find(index, "运行项目测试")
+	result := Find(index, "run project tests")
 	if result.Match == nil || result.Match.ID != "npm:test" {
 		t.Fatalf("expected npm:test, got %#v", result.Match)
 	}
@@ -43,7 +43,7 @@ func TestFindProjectScript(t *testing.T) {
 
 func TestFindReturnsNoCandidateForUnrelatedIntent(t *testing.T) {
 	index := model.Index{GeneratedAt: time.Now(), Tools: []model.Tool{{ID: "rg", Command: "rg", Status: "present"}}}
-	result := Find(index, "编辑视频字幕")
+	result := Find(index, "edit video subtitles")
 	if result.Match != nil {
 		t.Fatalf("expected no candidates, got %#v", result.Match)
 	}
@@ -59,10 +59,10 @@ func TestFindUnknownInstalledCommandByExactName(t *testing.T) {
 
 func TestFindDoesNotReturnGenericSingleKeywordOverlap(t *testing.T) {
 	index := model.Index{GeneratedAt: time.Now(), Tools: []model.Tool{
-		{ID: "jq", Command: "jq", Status: "present", Intents: []string{"查询 JSON", "筛选 JSON"}},
-		{ID: "gh", Command: "gh", Status: "present", Intents: []string{"查询 GitHub", "查看 GitHub PR"}},
+		{ID: "jq", Command: "jq", Status: "present", Intents: []string{"query JSON", "filter JSON"}},
+		{ID: "gh", Command: "gh", Status: "present", Intents: []string{"query GitHub", "view GitHub pull requests"}},
 	}}
-	result := Find(index, "查询 JSON 配置中的端口")
+	result := Find(index, "query the port in a JSON config")
 	if result.Match == nil || result.Match.ID != "jq" {
 		t.Fatalf("expected only jq, got %#v", result.Match)
 	}
@@ -70,10 +70,10 @@ func TestFindDoesNotReturnGenericSingleKeywordOverlap(t *testing.T) {
 
 func TestJSONQueryDoesNotReturnHTTPToolFromExampleOnly(t *testing.T) {
 	index := model.Index{Scope: model.Scope{ID: "scope", ProjectName: "demo"}, Tools: []model.Tool{
-		{ID: "jq", Command: "jq", Status: "present", Description: "Query JSON", Intents: []string{"查询 JSON"}},
-		{ID: "curl", Command: "curl", Status: "present", Description: "HTTP client", Intents: []string{"发送 HTTP 请求"}, Examples: []model.Example{{Intent: "获取 JSON API", Command: "curl example"}}},
+		{ID: "jq", Command: "jq", Status: "present", Description: "Query JSON", Intents: []string{"query JSON"}},
+		{ID: "curl", Command: "curl", Status: "present", Description: "HTTP client", Intents: []string{"send an HTTP request"}, Examples: []model.Example{{Intent: "fetch a JSON API", Command: "curl example"}}},
 	}}
-	result := Find(index, "查询 JSON 配置中的端口")
+	result := Find(index, "query the port in a JSON config")
 	if result.Match == nil || result.Match.ID != "jq" {
 		t.Fatalf("expected only jq, got %#v", result.Match)
 	}
@@ -109,8 +109,8 @@ func TestMissingRuntimeIsNeverRecommended(t *testing.T) {
 }
 
 func TestReadySignalUsesNarrowProbeEvidence(t *testing.T) {
-	index := model.Index{Tools: []model.Tool{{ID: "binwalk", Command: "tooltruth exec binwalk --", Status: "ready", Managed: true, ResolverSource: "managed_digest_matched", SemanticSource: "builtin_catalog", Intents: []string{"分析固件"}}}}
-	result := Find(index, "分析固件")
+	index := model.Index{Tools: []model.Tool{{ID: "binwalk", Command: "tooltruth exec binwalk --", Status: "ready", Managed: true, ResolverSource: "managed_digest_matched", SemanticSource: "builtin_catalog", Intents: []string{"analyze firmware"}}}}
+	result := Find(index, "analyze firmware")
 	if result.Match == nil || result.Match.Signal.Availability != "managed_digest_matched" || result.Match.Signal.Behavior != "help_signature_probe_passed" {
 		t.Fatalf("unexpected ready evidence: %#v", result.Match)
 	}

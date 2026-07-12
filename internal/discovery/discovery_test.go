@@ -78,8 +78,8 @@ func TestProjectDescriptorMakesOpaqueCommandDiscoverableByIntent(t *testing.T) {
     "command": "fwx",
     "description": "Extract a supported router firmware image into a filesystem tree.",
     "capabilities": ["firmware_extraction"],
-    "intents": ["拆包路由器固件", "extract router firmware"],
-    "examples": [{"intent":"拆包固件", "command":"fwx unpack image.bin"}],
+    "intents": ["extract router firmware", "extract router firmware"],
+    "examples": [{"intent":"extract firmware", "command":"fwx unpack image.bin"}],
     "risk": "medium"
   }]
 }`
@@ -90,7 +90,7 @@ func TestProjectDescriptorMakesOpaqueCommandDiscoverableByIntent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result := search.Find(index, "拆包路由器固件")
+	result := search.Find(index, "extract router firmware")
 	if result.Match == nil || result.Match.ID != "firmware-unpack" || result.Match.Signal.Semantics != "project_declared" || result.Match.Signal.Behavior != "not_verified" {
 		t.Fatalf("opaque described command was not found by intent: %#v", result.Match)
 	}
@@ -214,7 +214,7 @@ func TestKnownBrokenPathDigestIsNotRecommended(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result := search.Find(index, "分析固件"); result.Match != nil {
+	if result := search.Find(index, "analyze firmware"); result.Match != nil {
 		t.Fatalf("known broken digest must be suppressed: %#v", result.Match)
 	}
 }

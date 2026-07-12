@@ -24,18 +24,18 @@ func TestCatalogRankingSmoke(t *testing.T) {
 		query string
 		want  string
 	}{
-		{"搜索 panic 日志并显示上下文", "ripgrep"},
-		{"查找所有 TypeScript 文件", "fd"},
-		{"查询 JSON 配置中的端口", "jq"},
-		{"读取 YAML 里的 server.port", "yq"},
-		{"查看当前 Git 代码改动", "git"},
-		{"发送 HTTP API 请求", "curl"},
-		{"运行所有 Go 测试", "go"},
-		{"运行 Python 脚本", "python"},
-		{"查看视频编码和时长元数据", "ffprobe"},
-		{"解压 zip 文件", "7zip"},
-		{"查看 GitHub pull requests", "gh"},
-		{"查看正在运行的容器", "docker"},
+		{"search panic logs with context", "ripgrep"},
+		{"find all TypeScript files", "fd"},
+		{"query the port in a JSON config", "jq"},
+		{"read server.port from YAML", "yq"},
+		{"show current Git changes", "git"},
+		{"send an HTTP API request", "curl"},
+		{"run all Go tests", "go"},
+		{"run a Python script", "python"},
+		{"inspect video codec and duration metadata", "ffprobe"},
+		{"extract a zip archive", "7zip"},
+		{"view GitHub pull requests", "gh"},
+		{"list running containers", "docker"},
 	}
 
 	hits := 0

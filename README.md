@@ -4,6 +4,8 @@ Small, local-first CLI primitives built for AI agents.
 
 Each command in this repository must do one narrow job, emit sparse and evidence-labeled output, compose with ordinary shell tools, and remain useful without a specific model, IDE, agent, daemon, or cloud service.
 
+The English repository is canonical. The capability contract is in docs/AI_CAPABILITY_STANDARD.md. AI agents should read the low-token docs/AI_CAPABILITY_INDEX.md first and open a detailed capability page only when needed. A Chinese documentation mirror is maintained separately; command names, signal names, JSON fields, and safety semantics remain identical.
+
 | Tool | Purpose | Status |
 |---|---|---|
 | `tooltruth` | Filter AI-proposed command names against the live local PATH and return sparse evidence. | Experimental |
@@ -63,7 +65,7 @@ The public help intentionally presents only `resolve` and `version`. Earlier exp
 go run ./cmd/tooltruth resolve yq jq python
 go run ./cmd/tooltruth resolve --identity yq
 go run ./cmd/tooltruth scan --project .
-go run ./cmd/tooltruth find "搜索 panic 日志并显示上下文" --project . --json
+go run ./cmd/tooltruth find "search panic logs with context" --project . --json
 go run ./cmd/tooltruth show rg --project . --json
 go run ./cmd/tooltruth doctor --project .
 go run ./cmd/tooltruth doctor binwalk --json
@@ -171,7 +173,7 @@ This feature is on `main` for measurement and is not included in the v0.1.0 bina
       "semantics": "curated_name_mapping",
       "availability": "path_resolved",
       "behavior": "not_verified",
-      "match": "intent:查询 JSON"
+      "match": "intent:query JSON"
     },
     "declared_example": "jq -r '.server.port' config.json"
   }
@@ -239,9 +241,9 @@ Create `.tooltruth.json` in the project root:
       "command": "fwx",
       "description": "Extract a supported router firmware image into a filesystem tree.",
       "capabilities": ["firmware_extraction"],
-      "intents": ["拆包路由器固件", "extract router firmware"],
+      "intents": ["extract router firmware", "analyze firmware"],
       "examples": [
-        {"intent": "拆包固件", "command": "fwx unpack image.bin"}
+        {"intent": "extract firmware", "command": "fwx unpack image.bin"}
       ],
       "risk": "medium"
     }
