@@ -4,7 +4,7 @@ Small, local-first CLI primitives built for AI agents.
 
 Each command in this repository must do one narrow job, emit sparse and evidence-labeled output, compose with ordinary shell tools, and remain useful without a specific model, IDE, agent, daemon, or cloud service.
 
-The English repository is canonical. The capability contract is in docs/AI_CAPABILITY_STANDARD.md. AI agents should read the low-token docs/AI_CAPABILITY_INDEX.md first and open a detailed capability page only when needed. A Chinese documentation mirror is maintained separately; command names, signal names, JSON fields, and safety semantics remain identical.
+The English repository is canonical. The capability contract is in docs/AI_CAPABILITY_STANDARD.md. AI agents should read the low-token docs/AI_CAPABILITY_INDEX.md first and open a detailed capability page only when needed. A Chinese documentation mirror is maintained at https://github.com/xgbtxy/agent-native-primitives-zh; command names, signal names, JSON fields, and safety semantics remain identical.
 
 | Tool | Purpose | Status |
 |---|---|---|
